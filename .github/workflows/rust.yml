@@ -13,8 +13,20 @@ jobs:
     name: Format, lint, and test
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: core
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: core
+      - uses: actions/checkout@v4
+        with:
+          repository: caros-labs/sdk
+          # Exact SDK revision tested with this Core API.
+          ref: 2f3f894d83d1bf92c1cfd5d47d65d8d8ad795705
+          path: sdk
+          persist-credentials: false
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
       - name: Check formatting

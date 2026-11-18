@@ -32,17 +32,17 @@ fn graceful_stop_waits_for_term_handler_and_never_restarts() {
     };
     let mut supervisor = Supervisor::new();
     supervisor.register(spec).unwrap();
-    supervisor.start("graceful").unwrap();
+    supervisor.start(&app_id("graceful")).unwrap();
     until(&mut supervisor, |_| dir.0.join("ready").exists());
-    supervisor.stop("graceful").unwrap();
-    supervisor.stop("graceful").unwrap();
+    supervisor.stop(&app_id("graceful")).unwrap();
+    supervisor.stop(&app_id("graceful")).unwrap();
     assert_eq!(
-        supervisor.status("graceful").unwrap().state,
+        supervisor.status(&app_id("graceful")).unwrap().state,
         AppState::Stopping
     );
     until(&mut supervisor, Supervisor::is_idle);
     assert!(dir.0.join("stopped").exists());
-    assert_eq!(supervisor.status("graceful").unwrap().restarts, 0);
+    assert_eq!(supervisor.status(&app_id("graceful")).unwrap().restarts, 0);
     assert!(
         !supervisor
             .drain_events()
@@ -61,15 +61,15 @@ fn unresponsive_app_is_killed_after_grace_period() {
     let grace = spec.stop_timeout;
     let mut supervisor = Supervisor::new();
     supervisor.register(spec).unwrap();
-    supervisor.start("stubborn").unwrap();
+    supervisor.start(&app_id("stubborn")).unwrap();
     until(&mut supervisor, |_| dir.0.join("ready").exists());
     let start = Instant::now();
-    supervisor.stop("stubborn").unwrap();
+    supervisor.stop(&app_id("stubborn")).unwrap();
     until(&mut supervisor, Supervisor::is_idle);
     assert!(start.elapsed() >= grace);
     assert_eq!(
         supervisor
-            .status("stubborn")
+            .status(&app_id("stubborn"))
             .unwrap()
             .last_exit
             .unwrap()
@@ -91,7 +91,7 @@ fn parent_exit_cleans_up_background_workers() {
     spec.working_directory = Some(dir.0.clone());
     let mut supervisor = Supervisor::new();
     supervisor.register(spec).unwrap();
-    supervisor.start("workers").unwrap();
+    supervisor.start(&app_id("workers")).unwrap();
     until(&mut supervisor, Supervisor::is_idle);
     let pid = fs::read_to_string(dir.0.join("worker"))
         .unwrap()

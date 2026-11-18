@@ -1,0 +1,10 @@
+{
+  "apps": [
+    {
+      "id": "bb0c8c97-8616-4235-a837-f48dbe391948",
+      "name": "Development sleeper",
+      "executable": "/bin/sleep",
+      "args": ["60"]
+    }
+  ]
+}

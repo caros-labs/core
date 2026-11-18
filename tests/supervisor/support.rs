@@ -27,7 +27,7 @@ impl Drop for TempDir {
 }
 
 pub fn shell(id: &str, script: &str) -> AppSpec {
-    let mut spec = AppSpec::new(id, "/bin/sh");
+    let mut spec = AppSpec::new(app_id(id), id, "/bin/sh");
     spec.args = vec!["-c".into(), script.into()];
     spec.stop_timeout = Duration::from_millis(100);
     spec
@@ -46,4 +46,15 @@ pub fn until(supervisor: &mut Supervisor, condition: impl Fn(&Supervisor) -> boo
         );
         thread::sleep(Duration::from_millis(5));
     }
+}
+
+// Named fixtures map to opaque IDs only inside tests.
+pub fn app_id(label: &str) -> caros_core::AppId {
+    use std::{
+        collections::BTreeMap,
+        sync::{Mutex, OnceLock},
+    };
+    static IDS: OnceLock<Mutex<BTreeMap<String, caros_core::AppId>>> = OnceLock::new();
+    let mut ids = IDS.get_or_init(Default::default).lock().unwrap();
+    *ids.entry(label.into()).or_default()
 }

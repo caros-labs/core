@@ -33,7 +33,8 @@ impl App {
 
     pub fn status(&self) -> AppStatus {
         AppStatus {
-            id: self.spec.id.clone(),
+            id: self.spec.id,
+            name: self.spec.name.clone(),
             state: self.state,
             pid: self.process.as_ref().map(AppProcess::id),
             restarts: self.restarts,
@@ -160,7 +161,7 @@ impl App {
 
     fn emit(&self, events: &mut VecDeque<AppEvent>, kind: EventKind) {
         events.push_back(AppEvent {
-            app_id: self.spec.id.clone(),
+            app_id: self.spec.id,
             kind,
         });
     }

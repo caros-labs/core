@@ -11,9 +11,9 @@ fn failed_process_restarts_exactly_up_to_budget() {
         delay: Duration::from_millis(15),
     };
     supervisor.register(spec).unwrap();
-    supervisor.start("crash").unwrap();
+    supervisor.start(&app_id("crash")).unwrap();
     until(&mut supervisor, Supervisor::is_idle);
-    let status = supervisor.status("crash").unwrap();
+    let status = supervisor.status(&app_id("crash")).unwrap();
     assert_eq!(status.state, AppState::Failed);
     assert_eq!(status.restarts, 2);
     assert_eq!(status.last_exit.unwrap().code, Some(7));
@@ -25,8 +25,8 @@ fn failed_process_restarts_exactly_up_to_budget() {
         3
     );
     // Only an explicit new start resets the budget.
-    supervisor.start("crash").unwrap();
-    assert_eq!(supervisor.status("crash").unwrap().restarts, 0);
+    supervisor.start(&app_id("crash")).unwrap();
+    assert_eq!(supervisor.status(&app_id("crash")).unwrap().restarts, 0);
 }
 
 #[test]
@@ -38,14 +38,14 @@ fn shutdown_cancels_pending_restart_and_rejects_new_starts() {
         delay: Duration::from_secs(30),
     };
     supervisor.register(spec).unwrap();
-    supervisor.start("crash").unwrap();
+    supervisor.start(&app_id("crash")).unwrap();
     until(&mut supervisor, |s| {
-        s.status("crash").unwrap().state == AppState::RestartPending
+        s.status(&app_id("crash")).unwrap().state == AppState::RestartPending
     });
     supervisor.shutdown().unwrap();
     supervisor.poll().unwrap();
     assert!(supervisor.is_idle());
-    assert!(supervisor.start("crash").is_err());
+    assert!(supervisor.start(&app_id("crash")).is_err());
     assert!(supervisor.register(shell("late", "exit 0")).is_err());
 }
 
@@ -60,13 +60,13 @@ fn restart_spawn_failure_still_exhausts_the_budget() {
     };
     let mut supervisor = Supervisor::new();
     supervisor.register(spec).unwrap();
-    supervisor.start("vanishes").unwrap();
+    supervisor.start(&app_id("vanishes")).unwrap();
     until(&mut supervisor, |s| {
-        s.status("vanishes").unwrap().state == AppState::RestartPending
+        s.status(&app_id("vanishes")).unwrap().state == AppState::RestartPending
     });
     fs::remove_dir(&dir.0).unwrap();
     until(&mut supervisor, Supervisor::is_idle);
-    let status = supervisor.status("vanishes").unwrap();
+    let status = supervisor.status(&app_id("vanishes")).unwrap();
     assert_eq!(status.state, AppState::Failed);
     assert_eq!(status.restarts, 2);
     assert_eq!(

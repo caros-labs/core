@@ -1,3 +1,4 @@
+use caros_protocol::AppId;
 use std::{collections::BTreeMap, ffi::OsString, path::PathBuf, time::Duration};
 
 /// Restarts are bounded across one explicitly started run, not reset by uptime.
@@ -13,7 +14,8 @@ pub enum RestartPolicy {
 
 #[derive(Clone, Debug)]
 pub struct AppSpec {
-    pub id: String,
+    pub id: AppId,
+    pub name: String,
     pub executable: PathBuf,
     pub args: Vec<OsString>,
     pub working_directory: Option<PathBuf>,
@@ -24,9 +26,10 @@ pub struct AppSpec {
 }
 
 impl AppSpec {
-    pub fn new(id: impl Into<String>, executable: impl Into<PathBuf>) -> Self {
+    pub fn new(id: AppId, name: impl Into<String>, executable: impl Into<PathBuf>) -> Self {
         Self {
-            id: id.into(),
+            id,
+            name: name.into(),
             executable: executable.into(),
             args: Vec::new(),
             working_directory: None,

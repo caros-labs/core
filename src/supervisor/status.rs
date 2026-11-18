@@ -1,3 +1,4 @@
+use caros_protocol::AppId;
 use std::{os::unix::process::ExitStatusExt, process::ExitStatus};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,7 +28,8 @@ impl From<ExitStatus> for ExitInfo {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppStatus {
-    pub id: String,
+    pub id: AppId,
+    pub name: String,
     pub state: AppState,
     pub pid: Option<u32>,
     pub restarts: u32,

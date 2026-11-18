@@ -11,9 +11,9 @@ fn successful_exit_is_reaped_and_does_not_restart() {
         delay: Duration::ZERO,
     };
     supervisor.register(spec).unwrap();
-    supervisor.start("one").unwrap();
+    supervisor.start(&app_id("one")).unwrap();
     until(&mut supervisor, Supervisor::is_idle);
-    let status = supervisor.status("one").unwrap();
+    let status = supervisor.status(&app_id("one")).unwrap();
     assert_eq!(status.state, AppState::Stopped);
     assert_eq!(status.pid, None);
     assert_eq!(status.restarts, 0);
@@ -27,17 +27,22 @@ fn successful_exit_is_reaped_and_does_not_restart() {
 #[test]
 fn registration_and_spawn_errors_are_reported() {
     let mut supervisor = Supervisor::new();
-    assert!(supervisor.register(AppSpec::new("", "/bin/true")).is_err());
+    assert!(
+        supervisor
+            .register(AppSpec::new(app_id("empty"), "", "/bin/true"))
+            .is_err()
+    );
     assert_eq!(
-        supervisor.start("unknown").unwrap_err().kind(),
+        supervisor.start(&app_id("unknown")).unwrap_err().kind(),
         io::ErrorKind::NotFound
     );
     assert_eq!(
-        supervisor.stop("unknown").unwrap_err().kind(),
+        supervisor.stop(&app_id("unknown")).unwrap_err().kind(),
         io::ErrorKind::NotFound
     );
     supervisor
         .register(AppSpec::new(
+            app_id("missing"),
             "missing",
             "/caros-test/nonexistent/executable",
         ))
@@ -49,12 +54,12 @@ fn registration_and_spawn_errors_are_reported() {
             .kind(),
         io::ErrorKind::AlreadyExists
     );
-    assert!(supervisor.start("missing").is_err());
+    assert!(supervisor.start(&app_id("missing")).is_err());
     assert_eq!(
-        supervisor.status("missing").unwrap().state,
+        supervisor.status(&app_id("missing")).unwrap().state,
         AppState::Failed
     );
-    assert!(supervisor.status("missing").unwrap().pid.is_none());
+    assert!(supervisor.status(&app_id("missing")).unwrap().pid.is_none());
 }
 
 #[test]
@@ -64,16 +69,19 @@ fn apps_are_independent_and_drop_reaps_live_children() {
         .register(shell("healthy", "exec sleep 60"))
         .unwrap();
     supervisor.register(shell("failed", "exit 2")).unwrap();
-    supervisor.start("healthy").unwrap();
-    let pid = supervisor.status("healthy").unwrap().pid.unwrap();
-    assert!(supervisor.start("healthy").is_err());
-    assert_eq!(supervisor.status("healthy").unwrap().pid, Some(pid));
-    supervisor.start("failed").unwrap();
+    supervisor.start(&app_id("healthy")).unwrap();
+    let pid = supervisor.status(&app_id("healthy")).unwrap().pid.unwrap();
+    assert!(supervisor.start(&app_id("healthy")).is_err());
+    assert_eq!(
+        supervisor.status(&app_id("healthy")).unwrap().pid,
+        Some(pid)
+    );
+    supervisor.start(&app_id("failed")).unwrap();
     until(&mut supervisor, |s| {
-        s.status("failed").unwrap().state == AppState::Failed
+        s.status(&app_id("failed")).unwrap().state == AppState::Failed
     });
     assert_eq!(
-        supervisor.status("healthy").unwrap().state,
+        supervisor.status(&app_id("healthy")).unwrap().state,
         AppState::Running
     );
     drop(supervisor);
@@ -100,7 +108,7 @@ fn launches_with_configured_arguments_environment_and_directory() {
     spec.working_directory = Some(dir.0.clone());
     let mut supervisor = Supervisor::new();
     supervisor.register(spec).unwrap();
-    supervisor.start("configured").unwrap();
+    supervisor.start(&app_id("configured")).unwrap();
     until(&mut supervisor, Supervisor::is_idle);
     assert_eq!(
         fs::read_to_string(dir.0.join("result")).unwrap(),

@@ -1,3 +1,4 @@
+use caros_protocol::AppId;
 use std::{
     collections::{BTreeMap, VecDeque},
     io,
@@ -10,7 +11,7 @@ use super::{AppEvent, AppSpec, AppStatus, app::App};
 /// Process I/O is inherited; this is supervision, not an application sandbox.
 #[derive(Default)]
 pub struct Supervisor {
-    apps: BTreeMap<String, App>,
+    apps: BTreeMap<AppId, App>,
     events: VecDeque<AppEvent>,
     shutting_down: bool,
 }
@@ -22,10 +23,10 @@ impl Supervisor {
 
     pub fn register(&mut self, spec: AppSpec) -> io::Result<()> {
         self.ensure_active()?;
-        if spec.id.trim().is_empty() || spec.executable.as_os_str().is_empty() {
+        if spec.name.trim().is_empty() || spec.executable.as_os_str().is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "app ID and executable are required",
+                "app name and executable are required",
             ));
         }
         if self.apps.contains_key(&spec.id) {
@@ -34,11 +35,11 @@ impl Supervisor {
                 "app ID is already registered",
             ));
         }
-        self.apps.insert(spec.id.clone(), App::new(spec));
+        self.apps.insert(spec.id, App::new(spec));
         Ok(())
     }
 
-    pub fn start(&mut self, id: &str) -> io::Result<()> {
+    pub fn start(&mut self, id: &AppId) -> io::Result<()> {
         self.ensure_active()?;
         self.apps
             .get_mut(id)
@@ -46,7 +47,7 @@ impl Supervisor {
             .start(&mut self.events)
     }
 
-    pub fn stop(&mut self, id: &str) -> io::Result<()> {
+    pub fn stop(&mut self, id: &AppId) -> io::Result<()> {
         self.apps
             .get_mut(id)
             .ok_or_else(unknown_app)?
@@ -65,8 +66,11 @@ impl Supervisor {
         first_error.map_or(Ok(()), Err)
     }
 
-    pub fn status(&self, id: &str) -> Option<AppStatus> {
+    pub fn status(&self, id: &AppId) -> Option<AppStatus> {
         self.apps.get(id).map(App::status)
+    }
+    pub fn list(&self) -> Vec<AppStatus> {
+        self.apps.values().map(App::status).collect()
     }
     pub fn is_idle(&self) -> bool {
         self.apps.values().all(App::is_idle)

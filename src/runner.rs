@@ -6,7 +6,7 @@ pub(crate) async fn run(spec: AppSpec) -> io::Result<ExitCode> {
     // Install handlers before starting children so Ctrl-C cannot orphan them.
     let mut interrupt = signal(SignalKind::interrupt())?;
     let mut terminate = signal(SignalKind::terminate())?;
-    let id = spec.id.clone();
+    let id = spec.id;
     let mut supervisor = Supervisor::new();
     supervisor.register(spec)?;
     supervisor.start(&id)?;

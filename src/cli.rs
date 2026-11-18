@@ -1,4 +1,5 @@
 use caros_core::supervisor::{AppSpec, RestartPolicy};
+use caros_protocol::AppId;
 use std::{ffi::OsString, time::Duration};
 
 pub(crate) const USAGE: &str = "Usage: caros-core [--max-restarts N] [--restart-delay-ms N] [--stop-timeout-ms N] -- EXECUTABLE [ARG ...]\n\nRuns one app locally. Restarts are disabled by default. SIGINT/SIGTERM stop the app and its process group.";
@@ -14,7 +15,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<A
         }
         if arg == "--" {
             let executable = args.next().ok_or("missing executable after --")?;
-            let mut spec = AppSpec::new("app", executable);
+            let mut spec = AppSpec::new(AppId::new(), "app", executable);
             spec.args = args.collect();
             spec.stop_timeout = Duration::from_millis(timeout);
             if restarts > 0 {
