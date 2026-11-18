@@ -1,0 +1,30 @@
+name: Branch flow
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+
+permissions: {}
+
+jobs:
+  branch-flow:
+    name: Branch flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate source and target branches
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$BASE_BRANCH" == "main" ]]; then
+            if [[ "$HEAD_BRANCH" != "dev" || "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]]; then
+              echo "::error::Only dev from this repository may merge into main. Merge your work into dev first."
+              exit 1
+            fi
+          fi
+          echo "Branch flow is valid."
