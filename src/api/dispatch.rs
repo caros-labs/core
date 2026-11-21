@@ -5,15 +5,19 @@ use tokio::sync::{broadcast, oneshot};
 
 pub(super) struct Command {
     pub request: Request,
+    pub peer_pid: Option<u32>,
     pub reply: oneshot::Sender<Answer>,
 }
 pub(super) struct Answer {
     pub result: Result<Reply, ApiError>,
     pub events: Option<broadcast::Receiver<LifecycleEvent>>,
+    pub microphone: Option<crate::microphone::MicrophoneLease>,
 }
 
 pub(super) struct Dispatcher {
     pub supervisor: Supervisor,
+    pub services: crate::services::ServiceRegistry,
+    pub microphone: crate::microphone::MicrophoneService,
     sequence: u64,
     events: broadcast::Sender<LifecycleEvent>,
 }
@@ -22,6 +26,8 @@ impl Dispatcher {
         let (events, _) = broadcast::channel(256);
         Self {
             supervisor,
+            services: Default::default(),
+            microphone: Default::default(),
             sequence: 0,
             events,
         }
@@ -35,9 +41,31 @@ impl Dispatcher {
             });
         }
     }
-    pub fn handle(&mut self, request: Request) -> Answer {
+    pub fn handle(&mut self, request: Request, peer_pid: Option<u32>) -> Answer {
         let mut events = None;
+        let mut microphone = None;
         let result = match request {
+            Request::MicrophoneStatus => Ok(Reply::MicrophoneStatus(self.microphone.status())),
+            Request::OpenMicrophone => self
+                .caller(peer_pid, true)
+                .and_then(|owner| self.microphone.open(owner))
+                .map(|lease| {
+                    microphone = Some(lease);
+                    Reply::MicrophoneOpened
+                }),
+            Request::SetMicrophoneMuted { muted } => self
+                .caller(peer_pid, true)
+                .and_then(|(app, _)| self.microphone.set_muted(app, muted))
+                .map(|()| Reply::Accepted),
+            Request::AcquireService { name } => self
+                .caller(peer_pid, true)
+                .and_then(|owner| self.services.acquire(&name, owner))
+                .map(Reply::Service),
+            Request::ReleaseService { name } => self
+                .caller(peer_pid, false)
+                .and_then(|owner| self.services.release(&name, owner))
+                .map(|()| Reply::Accepted),
+            Request::ServiceStatus { name } => self.services.status(&name).map(Reply::Service),
             Request::ListApps => Ok(Reply::Apps(self.snapshot())),
             Request::AppStatus { id } => self
                 .supervisor
@@ -64,7 +92,33 @@ impl Dispatcher {
             }
         };
         self.publish();
-        Answer { result, events }
+        Answer {
+            result,
+            events,
+            microphone,
+        }
+    }
+    fn caller(
+        &self,
+        pid: Option<u32>,
+        starting: bool,
+    ) -> Result<(caros_protocol::AppId, u32), ApiError> {
+        let pid =
+            pid.ok_or_else(|| ApiError::new(ErrorCode::PermissionDenied, "peer PID unavailable"))?;
+        self.supervisor
+            .list()
+            .into_iter()
+            .find(|app| {
+                app.pid == Some(pid)
+                    && (!starting || app.state == crate::supervisor::AppState::Running)
+            })
+            .map(|app| (app.id, pid))
+            .ok_or_else(|| {
+                ApiError::new(
+                    ErrorCode::PermissionDenied,
+                    "caller is not a registered running app process",
+                )
+            })
     }
     fn snapshot(&self) -> Vec<caros_protocol::AppStatus> {
         self.supervisor.list().into_iter().map(Into::into).collect()

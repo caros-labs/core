@@ -66,3 +66,16 @@ fn manifest_preserves_identity_across_renames_and_rejects_duplicates() {
         assert!(manifest::load(&path).is_err());
     }
 }
+
+#[tokio::test]
+async fn management_client_cannot_impersonate_a_registered_app_for_services() {
+    let mut core = super::support::TestCore::start();
+    let client = caros_sdk::ManagementClient::connect(&core.path)
+        .await
+        .unwrap();
+    let result = client.services().acquire("receiver").await;
+    assert!(
+        matches!(result, Err(caros_sdk::Error::Remote(e)) if e.code == caros_sdk::ErrorCode::PermissionDenied)
+    );
+    core.finish().await;
+}

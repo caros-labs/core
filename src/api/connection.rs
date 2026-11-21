@@ -20,6 +20,10 @@ pub(super) async fn serve(
             "management peer UID mismatch",
         ));
     }
+    let peer_pid = stream
+        .peer_cred()?
+        .pid()
+        .and_then(|pid| u32::try_from(pid).ok());
     let hello = timeout(IO_TIMEOUT, wire::read::<ClientMessage>(&mut stream)).await??;
     match hello {
         ClientMessage::Hello { version } if version == PROTOCOL_VERSION => {
@@ -56,7 +60,11 @@ pub(super) async fn serve(
         let (reply, response) = oneshot::channel();
         let answer = timeout(IO_TIMEOUT, async {
             commands
-                .send(Command { request, reply })
+                .send(Command {
+                    request,
+                    reply,
+                    peer_pid,
+                })
                 .await
                 .map_err(io::Error::other)?;
             response.await.map_err(io::Error::other)
@@ -70,6 +78,9 @@ pub(super) async fn serve(
             },
         )
         .await?;
+        if let Some(microphone) = answer.microphone {
+            return microphone.serve(stream).await;
+        }
         if let Some(mut events) = answer.events {
             loop {
                 tokio::select! {

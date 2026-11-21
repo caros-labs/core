@@ -20,6 +20,14 @@ impl CoreServer {
             dispatcher: Dispatcher::new(supervisor),
         })
     }
+    pub fn with_services(mut self, services: crate::services::ServiceRegistry) -> Self {
+        self.dispatcher.services = services;
+        self
+    }
+    pub fn with_microphone(mut self, config: crate::microphone::MicrophoneConfig) -> Self {
+        self.dispatcher.microphone = crate::microphone::MicrophoneService::new(config);
+        self
+    }
     pub async fn run(mut self, shutdown: impl Future<Output = ()>) -> io::Result<()> {
         tokio::pin!(shutdown);
         let (sender, mut commands) = mpsc::channel::<super::dispatch::Command>(64);
@@ -33,11 +41,15 @@ impl CoreServer {
                     stopping = true;
                     // No new commands once shutdown starts; no orphan sessions.
                     clients.abort_all();
+                    self.dispatcher.microphone.shutdown().await;
                     self.dispatcher.supervisor.shutdown()?;
+                    self.dispatcher.services.shutdown()?;
                     self.dispatcher.publish();
                 }
                 _ = ticks.tick() => {
                     self.dispatcher.supervisor.poll()?;
+                    self.dispatcher.services.poll(&self.dispatcher.supervisor)?;
+                    self.dispatcher.microphone.poll(&self.dispatcher.supervisor);
                     self.dispatcher.publish();
                 }
                 accepted = self.socket.listener.accept(), if !stopping && clients.len() < 64 => {
@@ -47,13 +59,18 @@ impl CoreServer {
                 }
                 Some(command) = commands.recv(), if !stopping => {
                     self.dispatcher.supervisor.poll()?;
+                    self.dispatcher.services.poll(&self.dispatcher.supervisor)?;
+                    self.dispatcher.microphone.poll(&self.dispatcher.supervisor);
                     self.dispatcher.publish();
-                    let answer = self.dispatcher.handle(command.request);
+                    let answer = self.dispatcher.handle(command.request, command.peer_pid);
                     let _ = command.reply.send(answer);
                 }
                 _ = clients.join_next(), if !clients.is_empty() => {}
             }
-            if stopping && self.dispatcher.supervisor.is_idle() {
+            if stopping
+                && self.dispatcher.supervisor.is_idle()
+                && self.dispatcher.services.is_idle()
+            {
                 return Ok(());
             }
         }

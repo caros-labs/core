@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let socket = socket.ok_or("--socket is required")?;
     let config = config.ok_or("--manifest is required")?;
-    let supervisor = manifest::load(config)?;
+    let configuration = manifest::load_configuration(config)?;
     let parent = socket
         .parent()
         .ok_or("socket requires a parent directory")?;
@@ -38,7 +38,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let mut interrupt = signal(SignalKind::interrupt())?;
     let mut terminate = signal(SignalKind::terminate())?;
-    let server = CoreServer::bind(&socket, supervisor)?;
+    let server = CoreServer::bind(&socket, configuration.apps)?
+        .with_services(configuration.services)
+        .with_microphone(configuration.microphone);
     eprintln!("Core management socket: {}", socket.display());
     server
         .run(async move {
