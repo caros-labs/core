@@ -28,6 +28,10 @@ impl CoreServer {
         self.dispatcher.microphone = crate::microphone::MicrophoneService::new(config);
         self
     }
+    pub fn with_playback(mut self, config: crate::playback::PlaybackConfig) -> Self {
+        self.dispatcher.playback = crate::playback::PlaybackService::new(config);
+        self
+    }
     pub async fn run(mut self, shutdown: impl Future<Output = ()>) -> io::Result<()> {
         tokio::pin!(shutdown);
         let (sender, mut commands) = mpsc::channel::<super::dispatch::Command>(64);
@@ -42,6 +46,7 @@ impl CoreServer {
                     // No new commands once shutdown starts; no orphan sessions.
                     clients.abort_all();
                     self.dispatcher.microphone.shutdown().await;
+                    self.dispatcher.playback.shutdown().await;
                     self.dispatcher.supervisor.shutdown()?;
                     self.dispatcher.services.shutdown()?;
                     self.dispatcher.publish();
@@ -50,6 +55,7 @@ impl CoreServer {
                     self.dispatcher.supervisor.poll()?;
                     self.dispatcher.services.poll(&self.dispatcher.supervisor)?;
                     self.dispatcher.microphone.poll(&self.dispatcher.supervisor);
+                    self.dispatcher.playback.poll(&self.dispatcher.supervisor);
                     self.dispatcher.publish();
                 }
                 accepted = self.socket.listener.accept(), if !stopping && clients.len() < 64 => {
@@ -61,6 +67,7 @@ impl CoreServer {
                     self.dispatcher.supervisor.poll()?;
                     self.dispatcher.services.poll(&self.dispatcher.supervisor)?;
                     self.dispatcher.microphone.poll(&self.dispatcher.supervisor);
+                    self.dispatcher.playback.poll(&self.dispatcher.supervisor);
                     self.dispatcher.publish();
                     let answer = self.dispatcher.handle(command.request, command.peer_pid);
                     let _ = command.reply.send(answer);

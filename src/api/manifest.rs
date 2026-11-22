@@ -19,6 +19,8 @@ struct Manifest {
     services: Vec<ServiceEntry>,
     #[serde(default)]
     microphone: crate::microphone::MicrophoneConfig,
+    #[serde(default)]
+    playback: crate::playback::PlaybackConfig,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -57,6 +59,7 @@ pub struct Configuration {
     pub apps: Supervisor,
     pub services: ServiceRegistry,
     pub microphone: crate::microphone::MicrophoneConfig,
+    pub playback: crate::playback::PlaybackConfig,
 }
 pub fn load(path: impl AsRef<Path>) -> io::Result<Supervisor> {
     let config = load_configuration(path)?;
@@ -103,10 +106,20 @@ pub fn load_configuration(path: impl AsRef<Path>) -> io::Result<Configuration> {
     {
         return Err(invalid("microphone grant refers to an unregistered app"));
     }
+    if manifest
+        .playback
+        .allowed_apps
+        .iter()
+        .chain(&manifest.playback.control_apps)
+        .any(|id| apps.status(id).is_none())
+    {
+        return Err(invalid("playback grant refers to an unregistered app"));
+    }
     Ok(Configuration {
         apps,
         services,
         microphone: manifest.microphone,
+        playback: manifest.playback,
     })
 }
 impl Entry {

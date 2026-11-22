@@ -40,7 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminate = signal(SignalKind::terminate())?;
     let server = CoreServer::bind(&socket, configuration.apps)?
         .with_services(configuration.services)
-        .with_microphone(configuration.microphone);
+        .with_microphone(configuration.microphone)
+        .with_playback(configuration.playback);
     eprintln!("Core management socket: {}", socket.display());
     server
         .run(async move {

@@ -12,12 +12,14 @@ pub(super) struct Answer {
     pub result: Result<Reply, ApiError>,
     pub events: Option<broadcast::Receiver<LifecycleEvent>>,
     pub microphone: Option<crate::microphone::MicrophoneLease>,
+    pub playback: Option<crate::playback::PlaybackLease>,
 }
 
 pub(super) struct Dispatcher {
     pub supervisor: Supervisor,
     pub services: crate::services::ServiceRegistry,
     pub microphone: crate::microphone::MicrophoneService,
+    pub playback: crate::playback::PlaybackService,
     sequence: u64,
     events: broadcast::Sender<LifecycleEvent>,
 }
@@ -28,6 +30,7 @@ impl Dispatcher {
             supervisor,
             services: Default::default(),
             microphone: Default::default(),
+            playback: Default::default(),
             sequence: 0,
             events,
         }
@@ -44,7 +47,24 @@ impl Dispatcher {
     pub fn handle(&mut self, request: Request, peer_pid: Option<u32>) -> Answer {
         let mut events = None;
         let mut microphone = None;
+        let mut playback = None;
         let result = match request {
+            Request::PlaybackStatus => Ok(Reply::PlaybackStatus(self.playback.status())),
+            Request::OpenPlayback => self
+                .caller(peer_pid, true)
+                .and_then(|owner| self.playback.open(owner))
+                .map(|lease| {
+                    playback = Some(lease);
+                    Reply::PlaybackOpened
+                }),
+            Request::SetPlaybackVolume { app, level, muted } => self
+                .caller(peer_pid, true)
+                .and_then(|(caller, _)| self.playback.set_volume(caller, app, level, muted))
+                .map(|()| Reply::Accepted),
+            Request::SetMasterVolume { volume } => self
+                .caller(peer_pid, true)
+                .and_then(|(caller, _)| self.playback.set_master(caller, volume))
+                .map(|()| Reply::Accepted),
             Request::MicrophoneStatus => Ok(Reply::MicrophoneStatus(self.microphone.status())),
             Request::OpenMicrophone => self
                 .caller(peer_pid, true)
@@ -96,6 +116,7 @@ impl Dispatcher {
             result,
             events,
             microphone,
+            playback,
         }
     }
     fn caller(

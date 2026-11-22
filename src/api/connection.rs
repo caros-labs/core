@@ -78,6 +78,9 @@ pub(super) async fn serve(
             },
         )
         .await?;
+        if let Some(playback) = answer.playback {
+            return playback.serve(stream).await;
+        }
         if let Some(microphone) = answer.microphone {
             return microphone.serve(stream).await;
         }

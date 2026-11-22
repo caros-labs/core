@@ -4,6 +4,7 @@
 compile_error!("CarOS process supervision currently requires Unix process groups.");
 
 pub mod microphone;
+pub mod playback;
 pub mod services;
 pub mod supervisor;
 
