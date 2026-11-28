@@ -24,7 +24,7 @@ jobs:
         with:
           repository: caros-labs/sdk
           # Exact SDK revision tested with this Core API.
-          ref: 2f3f894d83d1bf92c1cfd5d47d65d8d8ad795705
+          ref: b958097a916f8fbc20f36589a7a297db69629148
           path: sdk
           persist-credentials: false
       - name: Install Rust
